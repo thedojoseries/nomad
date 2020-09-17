@@ -1,0 +1,277 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Launches the infrastructure for the Nomad Dojo
+
+Parameters:
+  Namespace:
+    Description: A prefix used to name provisioned resources (i.e., the team's name)
+    Type: String
+
+  TeamNumber:
+    Description: The number of the team (for the subnet address)
+    Type: String
+
+Mappings: 
+  AMI: 
+    sa-east-1:
+      ID: ami-018ccfb6b4745882a
+    us-east-1:
+      ID: ami-02354e95b39ca8dec
+    us-east-2:
+      ID: ami-07c8bc5c1ce9598c3
+    us-west-1:
+      ID: ami-05655c267c89566dd
+    us-west-2:
+      ID: ami-0873b46c45c11058d
+    ca-central-1:
+      ID: ami-013d1df4bcea6ba95       
+    eu-central-1:
+      ID: ami-0c115dbd34c69a004       
+    eu-north-1:
+      ID: ami-039609244d2810a6b       
+    eu-west-1:
+      ID: ami-07d9160fa81ccffb5
+
+Resources:
+
+#================================================================================
+# Custom Resource to Generate User Password
+#================================================================================
+
+  GeneratePasswordLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  GeneratePasswordLambda: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Handler: "index.handler"
+      Role: !GetAtt GeneratePasswordLambdaRole.Arn
+      Code: 
+        ZipFile: >
+          var cfr = require('cfn-response');
+          var crypto = require('crypto');
+          
+          exports.handler = (event, context) => {
+            var resID = event.PhysicalResourceId;
+            var teamName = event.ResourceProperties.teamName;
+            var password = teamName + "-" + crypto.randomBytes(3).toString("hex");
+            
+            cfr.send(event, context, cfr.SUCCESS, {teamPassword: password}, resID)
+          }
+      Runtime: "nodejs12.x"
+      Timeout: "30"
+
+  GeneratePassword:
+    Type: Custom::GeneratePassword
+    Properties:
+      ServiceToken: !GetAtt GeneratePasswordLambda.Arn
+      teamName: !Ref Namespace
+
+  UserPasswordSecretsManager:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: !Sub Password for ${Namespace}
+      Name: !Sub /${Namespace}/password
+      SecretString: 
+        !GetAtt GeneratePassword.teamPassword
+
+#================================================================================
+# IAM User
+#================================================================================
+
+  TeamUser:
+    Type: AWS::IAM::User
+    Properties: 
+      LoginProfile: 
+        Password: !GetAtt GeneratePassword.teamPassword
+        PasswordResetRequired: false
+      ManagedPolicyArns: 
+        - !Ref DenyOtherRegionsPolicy
+        - !Ref Cloud9AccessPolicy
+      Path: /
+      Tags: 
+        - Key: namespace 
+          Value: !Ref Namespace
+      UserName: !Ref Namespace
+
+#================================================================================
+# IAM Policies for the team's user
+#================================================================================
+
+  DenyOtherRegionsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${Namespace}-DenyOtherRegionsAccess
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Deny
+          Action:
+            - "*"
+          Resource:
+            - "*"
+          Condition:
+            ForAnyValue:StringNotEqualsIfExists:
+              aws:RequestedRegion: [!Sub "${AWS::Region}"]
+  
+  Cloud9AccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${Namespace}-Cloud9Access
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Action:
+            - cloud9:*
+          Resource: 
+            - '*'
+
+#================================================================================
+# Network
+#================================================================================
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: false
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${Namespace}-vpc
+  
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        - Key: Name
+          Value: !Sub ${Namespace}-igw
+
+  VpcIgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone: !Sub ${AWS::Region}a
+      CidrBlock: !Sub 10.0.${TeamNumber}.0/24
+      MapPublicIpOnLaunch: True
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Namespace}-private-subneta
+  
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref Vpc
+
+  Route:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+#================================================================================
+# Cloud9 Environment
+#================================================================================
+
+  Cloud9Environment:
+    Type: AWS::Cloud9::EnvironmentEC2
+    Properties: 
+      AutomaticStopTimeMinutes: 20160
+      Description: !Sub ${Namespace} Cloud9 environment
+      InstanceType: t2.medium
+      Name: !Sub ${Namespace}-environment
+      OwnerArn: !GetAtt TeamUser.Arn
+      SubnetId: !Ref Subnet
+
+#================================================================================
+# Nomad Client - EC2 Instance
+#================================================================================
+
+  NomadClientSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security Group for the Nomad client
+      GroupName: !Sub ${Namespace}-nomad-client
+      SecurityGroupEgress: 
+        - CidrIp: 0.0.0.0/0
+          FromPort: 0
+          IpProtocol: tcp
+          ToPort: 65000
+      SecurityGroupIngress: 
+        - CidrIp: !Sub 10.0.${TeamNumber}.0/24
+          Description: Allow SSH from Cloud9 Environment
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          Description: Allow external access to Fabio Load Balancer
+          FromPort: 9999
+          IpProtocol: tcp
+          ToPort: 9999
+        - CidrIp: 0.0.0.0/0
+          Description: Allow external access to Fabios UI
+          FromPort: 9998
+          IpProtocol: tcp
+          ToPort: 9998
+      VpcId: !Ref Vpc
+
+  NomadClient:
+    Type: AWS::EC2::Instance
+    Properties: 
+      AvailabilityZone: !Sub ${AWS::Region}a
+      DisableApiTermination: False
+      ImageId: !FindInMap [AMI, !Ref AWS::Region, ID]
+      InstanceType: t3.medium
+      PrivateIpAddress: !Sub 10.0.${TeamNumber}.99
+      SecurityGroupIds: 
+        - !Ref NomadClientSecurityGroup
+      SourceDestCheck: True
+      SubnetId: !Ref Subnet
+      Tags: 
+        - Key: Name
+          Value: !Sub ${Namespace} Nomad Client
+      Tenancy: default
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash -e
+
+            # Sets user password
+            echo -e "${GeneratePassword.teamPassword}\n${GeneratePassword.teamPassword}" | passwd ec2-user 
+
+            # Enables password authentication through SSH 
+            sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/g" /etc/ssh/sshd_config
+
+            # Restarts SSH service 
+            service sshd restart
+
+            # Installs and starts Docker
+            amazon-linux-extras install docker -y
+            service docker start
+            usermod -a -G docker ec2-user
+            chkconfig docker on
