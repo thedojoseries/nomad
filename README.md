@@ -143,7 +143,7 @@ To run Nomad in dev mode is very easy. Type in the following in the terminal:
 sudo nomad agent -dev
 ```
 
-**PS: if running `sudo nomad` results in `command not found`, [take a look at this Stack Overflow answer](https://askubuntu.com/questions/611528/why-cant-sudo-find-a-command-after-i-added-it-to-path).
+**PS: if running `sudo nomad` results in `command not found`, [take a look at this Stack Overflow answer](https://askubuntu.com/questions/611528/why-cant-sudo-find-a-command-after-i-added-it-to-path).**
 
 Now, to interact with the Nomad server, you will have to open a new terminal tab. Click on the green plus symbol at the top of the Cloud9 terminal and select `New Terminal`.
 
@@ -459,7 +459,7 @@ To double check Consul has been successfully deployed, go to the Nomad client, r
 
 Now that Consul is running, let's modify the front-end to register itself. Service registry can be achieved with the [service stanza](https://www.nomadproject.io/docs/job-specification/service).
 
-The service stanza has tons of parameters. Here is what you need to configure:
+The service stanza has tons of parameters. Here is what you need to configure in `frontend.nomad`:
 
 * Give your service a `name`
 * Configure the `port`. You do not need to specify the port number. You can simply use the port label you defined (e.g. in `port "http" { }`, `http` is the label)
