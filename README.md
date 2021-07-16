@@ -24,7 +24,6 @@
     + [Definition of Done](#definition-of-done-3)
   * [Allocating a host port for the front-end container (Phase 5)](#allocating-a-host-port-for-the-front-end-container-phase-5)
     + [For Discussion](#for-discussion-1)
-    + [Definition of Done](#definition-of-done-4)
   * [Scaling the Front-end (Phase 6)](#scaling-the-front-end-phase-6)
     + [For Discussion](#for-discussion-2)
     + [Definition of Done](#definition-of-done-5)
@@ -349,10 +348,6 @@ task "XXXXXX" {
 The snippet above will allocate port `8080` in the host and map it to port `8080` in the container. We'll see later why this is not a good idea, but let's go ahead with it for now.
 
 Plan and run the front-end job again.
-
-### For Discussion
-
-The `network` stanza can be defined in 2 different places: under `group` and under `task`. What's the difference?
 
 ### Definition of Done
 
