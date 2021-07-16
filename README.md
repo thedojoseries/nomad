@@ -23,7 +23,7 @@
     + [Accessing the Nomad UI](#accessing-the-nomad-ui)
     + [Definition of Done](#definition-of-done-3)
   * [Allocating a host port for the front-end container (Phase 5)](#allocating-a-host-port-for-the-front-end-container-phase-5)
-    + [For Discussion](#for-discussion-1)
+    + [Definition of Done](#definition-of-done-4)
   * [Scaling the Front-end (Phase 6)](#scaling-the-front-end-phase-6)
     + [For Discussion](#for-discussion-2)
     + [Definition of Done](#definition-of-done-5)
