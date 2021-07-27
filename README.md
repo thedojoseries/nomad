@@ -2,7 +2,7 @@
 
 - [Introduction](#introduction)
 - [How the Challenge is Structured](#how-the-challenge-is-structured)
-- [Problem Statemement](#problem-statemement)
+- [Problem Statement](#problem-statement)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
   * [Accessing the AWS Console](#accessing-the-aws-console)
@@ -54,7 +54,7 @@ In this challenge, you will set up a Nomad cluster and will deploy a front-end a
 
 The challenge will start with an overview of the problem statement and the solution's architecture, followed by a few sections to help you set up your environment. Then, there will be number of sections where each one of them tackles a small piece of the puzzle. And to make sure you've figured out each small piece correctly, there will be **Definition of Done** sections to show you how to test your solution. Finally, you will see some **For discussion** sections (which are optional and can be skipped). The goal of these sections is to create a discussion between the team members and the organizers about a certain topic.
 
-# Problem Statemement
+# Problem Statement
 
 JJR is a multi-national corporation that has recently decided to migrate all their applications to the Cloud and because the Cloud is such a dynamic environment where servers can be easily replaced, they want to use an application scheduler. JJR’s DevOps team has been doing a POC with Kubernetes but they agreed that Kubernetes is unnecessarily complex. After attending HashiConf Digital this year and meeting YOU, a Nomad expert, JJR’s DevOps lead was adamant that Nomad could be the application scheduler they were looking for.
 
